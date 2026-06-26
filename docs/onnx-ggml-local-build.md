@@ -52,7 +52,7 @@ Engine must first produce a `dist/run` directory that contains the ONNX GGML Plu
 | Dependency | Source | Purpose |
 | --- | --- | --- |
 | AivisSpeech-Engine | Our fork / ONNX GGML branch | Engine runtime, AIVM/AIVMX to GGUF cache preparation, ONNX GGML provider selection |
-| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `0c6678415023c44d52dcf322827c33d36a352cb2` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API |
+| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `7b83c9c1408ae01712d612b5ac35f63b76861e0a` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API |
 | ONNX Runtime headers | `onnxruntime-linux-x64-1.26.0.tgz` | Build the Plugin EP |
 | Vulkan SDK | LunarG `1.3.296.0` | Build ggml Vulkan shaders/backend when the system SDK is too old |
 | `patchelf` | Linux package manager | Patch packaged shared libraries to use `$ORIGIN` rpath |
@@ -92,7 +92,7 @@ export PATH="${VULKAN_SDK}/bin:${PATH}"
 
 ```bash
 git clone --recursive https://github.com/clawd20130/TTS.cpp.git "$TTS_CPP_DIR"
-git -C "$TTS_CPP_DIR" checkout 0c6678415023c44d52dcf322827c33d36a352cb2
+git -C "$TTS_CPP_DIR" checkout 7b83c9c1408ae01712d612b5ac35f63b76861e0a
 git -C "$TTS_CPP_DIR" submodule update --init --recursive
 
 cmake \
@@ -178,6 +178,35 @@ In another terminal:
 ```bash
 curl -fsS http://127.0.0.1:10109/version
 ```
+
+## Benchmark Snapshot
+
+The current Windows Intel Arc B580 local benchmark uses the same
+`tempoDynamicsScale=1.0` path that the App gets from the Engine `/audio_query`
+default. Raw JSON and WAV audio samples are maintained in the Engine repo under
+`docs/res/onnx-ggml-plugin-benchmark/`.
+
+| text length | ONNX CPU RTF | ONNX DirectML RTF | ONNX GGML Plugin EP Vulkan RTF |
+| --- | ---: | ---: | ---: |
+| short | `0.425` | `2.402` | `0.105` |
+| medium | `0.373` | `1.390` | `0.098` |
+| long | `0.284` | `0.207` | `0.056` |
+| overall mean | `0.361` | `1.333` | `0.087` |
+
+Provider validation for this run:
+
+```json
+{
+  "onnx-cpu": ["CPUExecutionProvider"],
+  "onnx-directml": ["DmlExecutionProvider", "CPUExecutionProvider"],
+  "onnx-ggml-vulkan": ["AivisGgmlExecutionProvider", "CPUExecutionProvider"]
+}
+```
+
+On this machine, DirectML remains shape-sensitive and can still be slow for new
+short or medium sentences. The GGML Plugin EP Vulkan path is faster than both
+ONNX CPU and ONNX DirectML for all three warm-run text lengths with the pinned
+TTS.cpp build above.
 
 ## 2. Run The App In Development Mode
 
