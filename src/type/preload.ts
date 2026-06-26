@@ -221,8 +221,19 @@ export type SavingSetting = ConfigType["savingSetting"];
 
 export type EngineSettings = Record<EngineId, EngineSettingType>;
 
+export const developmentGpuBackendSchema = z.enum([
+  "auto",
+  "directml",
+  "cuda",
+  "ggml",
+]);
+export type DevelopmentGpuBackend = z.infer<
+  typeof developmentGpuBackendSchema
+>;
+
 export const engineSettingSchema = z.object({
   useGpu: z.boolean().default(false), // 初回は CPU モードで起動する
+  developmentGpuBackend: developmentGpuBackendSchema.default("auto"),
   outputSamplingRate: z
     .union([z.number(), z.literal("engineDefault")])
     .default("engineDefault"),

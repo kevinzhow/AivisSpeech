@@ -1,18 +1,46 @@
+import type { DevelopmentGpuBackend } from "@/type/preload";
+
 const ONNX_PROVIDER_ARG = "--onnx_provider";
+const USE_GPU_ARG = "--use_gpu";
+const AUTO_ONNX_PROVIDER = "auto";
+const CUDA_ONNX_PROVIDER = "cuda";
+const DIRECTML_ONNX_PROVIDER = "directml";
 const GGML_ONNX_PROVIDER = "ggml";
 const GGML_TTS_SERVER_BACKEND_ARG = "--ggml_tts_server_backend";
 
 export type GgmlTtsServerBackend = "cpu" | "vulkan" | "metal";
+
+const isDevelopmentGpuBackend = (
+  value: string | undefined,
+): value is DevelopmentGpuBackend => {
+  return (
+    value === AUTO_ONNX_PROVIDER ||
+    value === DIRECTML_ONNX_PROVIDER ||
+    value === CUDA_ONNX_PROVIDER ||
+    value === GGML_ONNX_PROVIDER
+  );
+};
+
+const getArgumentValue = (args: string[], name: string): string | undefined => {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg.startsWith(`${name}=`)) {
+      return arg.slice(name.length + 1);
+    }
+    if (arg === name) {
+      return args[index + 1];
+    }
+  }
+
+  return undefined;
+};
 
 const hasArgumentValue = (
   args: string[],
   name: string,
   value: string,
 ): boolean => {
-  return args.some(
-    (arg, index) =>
-      arg === `${name}=${value}` || (arg === name && args[index + 1] === value),
-  );
+  return getArgumentValue(args, name) === value;
 };
 
 const getCurrentPlatform = (): string => {
@@ -82,6 +110,39 @@ const removeArgumentValue = (args: string[], name: string): string[] => {
   return resolvedArgs;
 };
 
+const removeFlagArgument = (args: string[], name: string): string[] => {
+  return args.filter((arg) => arg !== name && !arg.startsWith(`${name}=`));
+};
+
+const removeManagedGpuArguments = (args: string[]): string[] => {
+  return removeArgumentValue(
+    removeArgumentValue(
+      removeFlagArgument(args, USE_GPU_ARG),
+      ONNX_PROVIDER_ARG,
+    ),
+    GGML_TTS_SERVER_BACKEND_ARG,
+  );
+};
+
+const resolveGpuBackendSelection = (
+  executionArgs: string[],
+  developmentGpuBackend: DevelopmentGpuBackend,
+): DevelopmentGpuBackend => {
+  if (developmentGpuBackend !== AUTO_ONNX_PROVIDER) {
+    return developmentGpuBackend;
+  }
+
+  const configuredProvider = getArgumentValue(executionArgs, ONNX_PROVIDER_ARG);
+  if (
+    isDevelopmentGpuBackend(configuredProvider) &&
+    configuredProvider !== AUTO_ONNX_PROVIDER
+  ) {
+    return configuredProvider;
+  }
+
+  return AUTO_ONNX_PROVIDER;
+};
+
 export const isGgmlExecutionArgs = (executionArgs: string[]): boolean => {
   return hasArgumentValue(executionArgs, ONNX_PROVIDER_ARG, GGML_ONNX_PROVIDER);
 };
@@ -89,9 +150,13 @@ export const isGgmlExecutionArgs = (executionArgs: string[]): boolean => {
 export const resolveGgmlTtsServerBackend = (
   executionArgs: string[],
   useGpu: boolean,
+  developmentGpuBackend: DevelopmentGpuBackend = "auto",
   platform: string = getCurrentPlatform(),
 ): GgmlTtsServerBackend | undefined => {
-  if (!isGgmlExecutionArgs(executionArgs)) {
+  if (
+    resolveGpuBackendSelection(executionArgs, developmentGpuBackend) !==
+    GGML_ONNX_PROVIDER
+  ) {
     return undefined;
   }
 
@@ -105,17 +170,27 @@ export const resolveGgmlTtsServerBackend = (
 export const resolveEngineBackendLabel = (
   executionArgs: string[],
   useGpu: boolean,
+  developmentGpuBackend: DevelopmentGpuBackend = "auto",
   platform: string = getCurrentPlatform(),
-): string | undefined => {
-  if (!isGgmlExecutionArgs(executionArgs)) {
-    return undefined;
-  }
-
+): string => {
   if (!useGpu) {
     return "Backend: ORT / CPU";
   }
 
-  return `Backend: GGML / ${getDefaultGgmlGpuBackend(platform).toUpperCase()}`;
+  const gpuBackend = resolveGpuBackendSelection(
+    executionArgs,
+    developmentGpuBackend,
+  );
+  switch (gpuBackend) {
+    case "auto":
+      return "Backend: ORT / Auto GPU";
+    case "directml":
+      return "Backend: ORT / DirectML";
+    case "cuda":
+      return "Backend: ORT / CUDA";
+    case "ggml":
+      return `Backend: GGML / ${getDefaultGgmlGpuBackend(platform).toUpperCase()}`;
+  }
 };
 
 /**
@@ -124,27 +199,55 @@ export const resolveEngineBackendLabel = (
 export const resolveEngineExecutionArgs = (
   executionArgs: string[],
   useGpu: boolean,
+  developmentGpuBackend: DevelopmentGpuBackend = "auto",
   platform: string = getCurrentPlatform(),
 ): string[] => {
-  const ggmlBackend = resolveGgmlTtsServerBackend(
-    executionArgs,
-    useGpu,
-    platform,
-  );
-  if (ggmlBackend == undefined) {
-    return executionArgs.concat(useGpu ? ["--use_gpu"] : []);
-  }
-
   if (!useGpu) {
-    return removeArgumentValue(
-      removeArgumentValue(executionArgs, ONNX_PROVIDER_ARG),
-      GGML_TTS_SERVER_BACKEND_ARG,
-    );
+    return removeManagedGpuArguments(executionArgs);
   }
 
-  return replaceOrAppendArgumentValue(
+  const gpuBackend = resolveGpuBackendSelection(
     executionArgs,
-    GGML_TTS_SERVER_BACKEND_ARG,
-    ggmlBackend,
+    developmentGpuBackend,
   );
+  switch (gpuBackend) {
+    case "auto":
+      return removeArgumentValue(
+        removeFlagArgument(executionArgs, USE_GPU_ARG),
+        GGML_TTS_SERVER_BACKEND_ARG,
+      ).concat([USE_GPU_ARG]);
+    case "directml":
+      return replaceOrAppendArgumentValue(
+        removeArgumentValue(
+          removeFlagArgument(executionArgs, USE_GPU_ARG),
+          GGML_TTS_SERVER_BACKEND_ARG,
+        ),
+        ONNX_PROVIDER_ARG,
+        DIRECTML_ONNX_PROVIDER,
+      );
+    case "cuda":
+      return replaceOrAppendArgumentValue(
+        removeArgumentValue(
+          removeFlagArgument(executionArgs, USE_GPU_ARG),
+          GGML_TTS_SERVER_BACKEND_ARG,
+        ),
+        ONNX_PROVIDER_ARG,
+        CUDA_ONNX_PROVIDER,
+      );
+    case "ggml":
+      return replaceOrAppendArgumentValue(
+        replaceOrAppendArgumentValue(
+          removeFlagArgument(executionArgs, USE_GPU_ARG),
+          ONNX_PROVIDER_ARG,
+          GGML_ONNX_PROVIDER,
+        ),
+        GGML_TTS_SERVER_BACKEND_ARG,
+        resolveGgmlTtsServerBackend(
+          executionArgs,
+          useGpu,
+          developmentGpuBackend,
+          platform,
+        ) ?? getDefaultGgmlGpuBackend(platform),
+      );
+  }
 };

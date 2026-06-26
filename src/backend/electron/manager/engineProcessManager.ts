@@ -147,14 +147,18 @@ export class EngineProcessManager {
     if (engineSetting == undefined)
       throw new Error(`No such engineSetting: engineId == ${engineId}`);
 
-    const useGpu = engineSetting.useGpu;
-    log.info(`ENGINE ${engineId} mode: ${useGpu ? "GPU" : "CPU"}`);
+    const { useGpu, developmentGpuBackend } = engineSetting;
+    log.info(
+      `ENGINE ${engineId} mode: ${useGpu ? "GPU" : "CPU"} ` +
+        `(backend: ${developmentGpuBackend})`,
+    );
 
     // エンジンプロセスの起動
     const enginePath = engineInfo.executionFilePath;
     const args = resolveEngineExecutionArgs(
       engineInfo.executionArgs,
       useGpu,
+      developmentGpuBackend,
     ).concat([
       "--host",
       engineHostInfo.hostname,
