@@ -13,6 +13,7 @@ import {
 } from "../portHelper";
 
 import { getConfigManager } from "../electronConfig";
+import { resolveEngineExecutionArgs } from "./engineExecutionArgs";
 import { getEngineInfoManager } from "./engineInfoManager";
 import { EngineId, EngineInfo } from "@/type/preload";
 import { createLogger } from "@/helpers/log";
@@ -151,7 +152,10 @@ export class EngineProcessManager {
 
     // エンジンプロセスの起動
     const enginePath = engineInfo.executionFilePath;
-    const args = engineInfo.executionArgs.concat(useGpu ? ["--use_gpu"] : [], [
+    const args = resolveEngineExecutionArgs(
+      engineInfo.executionArgs,
+      useGpu,
+    ).concat([
       "--host",
       engineHostInfo.hostname,
       "--port",
@@ -311,7 +315,12 @@ export class EngineProcessManager {
       const engineKilled = engineProcess?.signalCode != undefined;
 
       // engineProcess == undefinedの場合true
-      if (engineExited || engineKilled) {
+      if (
+        engineProcessContainer == undefined ||
+        engineProcess == undefined ||
+        engineExited ||
+        engineKilled
+      ) {
         log.info(
           `ENGINE ${engineId}: Process is not started yet or already killed. Starting process...`,
         );
@@ -333,7 +342,6 @@ export class EngineProcessManager {
         resolve();
       };
 
-      if (engineProcess == undefined) throw Error("engineProcess == undefined");
       if (engineProcess.pid == undefined)
         throw Error("engineProcess.pid == undefined");
 

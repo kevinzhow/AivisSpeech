@@ -400,19 +400,33 @@ export const settingStore = createPartialStore<SettingStoreTypes>({
           }
         }
 
+        const engineInfo = state.engineInfos[engineId];
+        if (engineInfo != undefined && !engineInfo.executionEnabled) {
+          await showAlertDialog({
+            title: "エンジンモードを変更できません",
+            message:
+              "この音声合成エンジンは外部で起動されているため、AivisSpeech から CPU/GPU モードを切り替えることはできません。\n" +
+              "モードを変更する場合は、エンジンを起動し直してください。",
+          });
+          return;
+        }
+
         showLoadingScreen({
           message: "起動モードを変更中です",
         });
 
-        void actions.SET_ENGINE_SETTING({
-          engineSetting: { ...state.engineSettings[engineId], useGpu },
-          engineId,
-        });
-        const result = await actions.RESTART_ENGINES({
-          engineIds: [engineId],
-        });
-
-        hideAllLoadingScreen();
+        let result = { success: false, anyNewCharacters: false };
+        try {
+          await actions.SET_ENGINE_SETTING({
+            engineSetting: { ...state.engineSettings[engineId], useGpu },
+            engineId,
+          });
+          result = await actions.RESTART_ENGINES({
+            engineIds: [engineId],
+          });
+        } finally {
+          hideAllLoadingScreen();
+        }
 
         // GPUモードに変更できなかった場合はCPUモードに戻す
         // FIXME: useGpu設定を保存してからエンジン起動を試すのではなく、逆にしたい

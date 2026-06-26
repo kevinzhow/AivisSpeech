@@ -61,6 +61,12 @@
                   対応する GPU が搭載されていないため、GPU モードは利用できません。
                 </QTooltip>
               </ButtonToggleCell>
+              <div
+                v-if="developmentEngineBackendInfo != undefined"
+                class="development-backend-info text-caption q-px-md q-pb-sm"
+              >
+                {{ developmentEngineBackendInfo }}
+              </div>
               <QCardActions class="no-wrap q-px-md bg-surface-darken">
                 <div>
                   <div>音声のサンプリングレート</div>
@@ -502,6 +508,7 @@ import FileNameTemplateDialog from "./FileNameTemplateDialog.vue";
 import ToggleCell from "./ToggleCell.vue";
 import ButtonToggleCell from "./ButtonToggleCell.vue";
 import { useStore } from "@/store";
+import { resolveEngineBackendLabel } from "@/domain/engineExecutionArgs";
 import {
   DEFAULT_AUDIO_FILE_NAME_TEMPLATE,
   buildAudioFileNameFromRawData,
@@ -534,6 +541,21 @@ const engineUseGpu = computed({
 });
 const engineIds = computed(() => store.state.engineIds);
 const engineInfos = computed(() => store.state.engineInfos);
+const developmentEngineBackendInfo = computed(() => {
+  if (import.meta.env.MODE !== "development") {
+    return undefined;
+  }
+
+  const engineInfo = engineInfos.value[selectedEngineId.value];
+  if (engineInfo == undefined) {
+    return undefined;
+  }
+
+  return resolveEngineBackendLabel(
+    engineInfo.executionArgs,
+    engineUseGpu.value,
+  );
+});
 const inheritAudioInfoMode = computed(() => store.state.inheritAudioInfo);
 const activePointScrollMode = computed({
   get: () => store.state.activePointScrollMode,
@@ -877,6 +899,12 @@ const renderEngineNameLabel = (engineId: EngineId) => {
   letter-spacing: 0.03333em;
   margin-top: 2px;
   color: #c6c6c6;
+}
+
+.development-backend-info {
+  margin-top: -8px;
+  color: colors.$display;
+  opacity: 0.7;
 }
 
 .hotkey-table {
