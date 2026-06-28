@@ -188,15 +188,16 @@ curl -fsS http://127.0.0.1:10109/version
 
 The current Windows Intel Arc B580 local benchmark uses the same
 `tempoDynamicsScale=1.0` path that the App gets from the Engine `/audio_query`
-default. The latest FP16 matrix raw JSON and WAV audio samples are maintained
-in the Engine repo under `docs/res/onnx-ggml-plugin-benchmark/`.
+default. Warmup uses separate non-measured texts, matching the Engine benchmark
+rule. The latest raw JSON and WAV audio samples are maintained in the Engine
+repo under `docs/res/onnx-ggml-plugin-benchmark/`.
 
 | text length | ONNX CPU RTF | ONNX DirectML RTF | ONNX GGML Plugin EP Vulkan default FP16 RTF |
 | --- | ---: | ---: | ---: |
-| short | `0.437` | `1.790` | `0.108` |
-| medium | `0.351` | `1.223` | `0.090` |
-| long | `0.287` | `0.443` | `0.055` |
-| overall mean | `0.358` | `1.152` | `0.085` |
+| short | `0.415` | `0.551` | `0.209` |
+| medium | `0.347` | `0.862` | `0.164` |
+| long | `0.243` | `0.220` | `0.038` |
+| overall mean | `0.335` | `0.544` | `0.137` |
 
 Provider validation for this run:
 
@@ -204,19 +205,16 @@ Provider validation for this run:
 {
   "onnx-cpu": ["CPUExecutionProvider"],
   "onnx-directml": ["DmlExecutionProvider", "CPUExecutionProvider"],
-  "onnx-ggml-vulkan-jpbert-fp16-voices-fp16": [
-    "AivisGgmlExecutionProvider",
-    "CPUExecutionProvider"
-  ]
+  "onnx-ggml-vulkan": ["AivisGgmlExecutionProvider", "CPUExecutionProvider"]
 }
 ```
 
 On this machine, DirectML remains shape-sensitive and can still be slow for
 Style-Bert-VITS2 app-default sentence shapes. The GGML Plugin EP Vulkan default
-path, JP-BERT FP16 `linear` plus FP16 voices, is faster than both ONNX CPU and
-ONNX DirectML for all three warm-run text lengths with the pinned TTS.cpp build
-above. The full FP16/FP32 JP-BERT and voice GGUF matrix is recorded in the
-Engine benchmark document.
+path, JP-BERT FP16 `linear` plus FP16 voices, is faster than DirectML for all
+three measured text lengths and faster than CPU for medium and long samples
+with the pinned TTS.cpp build above. Short and medium RTF include more
+shape/cache first-use cost than older same-text warm-run snapshots.
 
 ## 2. Run The App In Development Mode
 
