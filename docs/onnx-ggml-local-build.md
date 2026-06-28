@@ -97,7 +97,7 @@ export PATH="${VULKAN_SDK}/bin:${PATH}"
 
 ```bash
 git clone --recursive https://github.com/clawd20130/TTS.cpp.git "$TTS_CPP_DIR"
-git -C "$TTS_CPP_DIR" checkout 7b83c9c1408ae01712d612b5ac35f63b76861e0a
+git -C "$TTS_CPP_DIR" checkout 94792ed2599656618c1d5eb3934754c391eb2a54
 git -C "$TTS_CPP_DIR" submodule update --init --recursive
 
 cmake \
@@ -188,15 +188,15 @@ curl -fsS http://127.0.0.1:10109/version
 
 The current Windows Intel Arc B580 local benchmark uses the same
 `tempoDynamicsScale=1.0` path that the App gets from the Engine `/audio_query`
-default. Raw JSON and WAV audio samples are maintained in the Engine repo under
-`docs/res/onnx-ggml-plugin-benchmark/`.
+default. The latest FP16 matrix raw JSON and WAV audio samples are maintained
+in the Engine repo under `docs/res/onnx-ggml-plugin-benchmark/`.
 
-| text length | ONNX CPU RTF | ONNX DirectML RTF | ONNX GGML Plugin EP Vulkan RTF |
+| text length | ONNX CPU RTF | ONNX DirectML RTF | ONNX GGML Plugin EP Vulkan default FP16 RTF |
 | --- | ---: | ---: | ---: |
-| short | `0.425` | `2.402` | `0.105` |
-| medium | `0.373` | `1.390` | `0.098` |
-| long | `0.284` | `0.207` | `0.056` |
-| overall mean | `0.361` | `1.333` | `0.087` |
+| short | `0.437` | `1.790` | `0.108` |
+| medium | `0.351` | `1.223` | `0.090` |
+| long | `0.287` | `0.443` | `0.055` |
+| overall mean | `0.358` | `1.152` | `0.085` |
 
 Provider validation for this run:
 
@@ -204,14 +204,19 @@ Provider validation for this run:
 {
   "onnx-cpu": ["CPUExecutionProvider"],
   "onnx-directml": ["DmlExecutionProvider", "CPUExecutionProvider"],
-  "onnx-ggml-vulkan": ["AivisGgmlExecutionProvider", "CPUExecutionProvider"]
+  "onnx-ggml-vulkan-jpbert-fp16-voices-fp16": [
+    "AivisGgmlExecutionProvider",
+    "CPUExecutionProvider"
+  ]
 }
 ```
 
-On this machine, DirectML remains shape-sensitive and can still be slow for new
-short or medium sentences. The GGML Plugin EP Vulkan path is faster than both
-ONNX CPU and ONNX DirectML for all three warm-run text lengths with the pinned
-TTS.cpp build above.
+On this machine, DirectML remains shape-sensitive and can still be slow for
+Style-Bert-VITS2 app-default sentence shapes. The GGML Plugin EP Vulkan default
+path, JP-BERT FP16 `linear` plus FP16 voices, is faster than both ONNX CPU and
+ONNX DirectML for all three warm-run text lengths with the pinned TTS.cpp build
+above. The full FP16/FP32 JP-BERT and voice GGUF matrix is recorded in the
+Engine benchmark document.
 
 ## 2. Run The App In Development Mode
 
