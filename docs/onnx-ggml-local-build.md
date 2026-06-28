@@ -52,7 +52,7 @@ Engine must first produce a `dist/run` directory that contains the ONNX GGML Plu
 | Dependency | Source | Purpose |
 | --- | --- | --- |
 | AivisSpeech-Engine | Our fork / ONNX GGML branch | Engine runtime, AIVM/AIVMX to GGUF cache preparation, ONNX GGML provider selection |
-| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `a053e7270261` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API, fast Vulkan conv1d path |
+| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `94792ed` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API, fast Vulkan conv1d path, Style-Bert GGUF quantization scopes |
 | ONNX Runtime headers | `onnxruntime-linux-x64-1.26.0.tgz` | Build the Plugin EP |
 | Vulkan SDK | LunarG `1.3.296.0` | Build ggml Vulkan shaders/backend when the system SDK is too old |
 | `patchelf` | Linux package manager | Patch packaged shared libraries to use `$ORIGIN` rpath |
