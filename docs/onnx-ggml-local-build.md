@@ -52,10 +52,15 @@ Engine must first produce a `dist/run` directory that contains the ONNX GGML Plu
 | Dependency | Source | Purpose |
 | --- | --- | --- |
 | AivisSpeech-Engine | Our fork / ONNX GGML branch | Engine runtime, AIVM/AIVMX to GGUF cache preparation, ONNX GGML provider selection |
-| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `7b83c9c1408ae01712d612b5ac35f63b76861e0a` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API |
+| TTS.cpp | `https://github.com/clawd20130/TTS.cpp.git`, pinned to `a053e7270261` | `libtts.so`, ggml Vulkan runtime, Style-Bert-VITS2 C API, fast Vulkan conv1d path |
 | ONNX Runtime headers | `onnxruntime-linux-x64-1.26.0.tgz` | Build the Plugin EP |
 | Vulkan SDK | LunarG `1.3.296.0` | Build ggml Vulkan shaders/backend when the system SDK is too old |
 | `patchelf` | Linux package manager | Patch packaged shared libraries to use `$ORIGIN` rpath |
+
+The Engine GGML cache defaults are JP-BERT FP16 `linear` plus synthesis voices
+FP16 mixed precision (`f16-no-embed-norm-no-ups`). The App does not configure
+those precision recipes directly; it only starts the packaged Engine with
+`--onnx_provider ggml`.
 
 ### Linux System Dependencies
 
