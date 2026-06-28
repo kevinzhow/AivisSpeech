@@ -25,9 +25,18 @@ on:
         description: "デバッグ用に成果物を artifact にアップロードするか"
         type: boolean
         default: false
+      engine_repository:
+        description: "AivisSpeech Engine のリリースをダウンロードするリポジトリ"
+        required: false
+        default: "kevinzhow/AivisSpeech-Engine"
+      engine_version:
+        description: "AivisSpeech Engine のリリースタグ"
+        required: false
+        default: "1.3.0-onnx-ggml.1"
 
 env:
-  AIVISSPEECH_ENGINE_VERSION: "1.1.0-dev"
+  AIVISSPEECH_ENGINE_REPOSITORY: ${{ github.event.inputs.engine_repository || 'kevinzhow/AivisSpeech-Engine' }}
+  AIVISSPEECH_ENGINE_VERSION: ${{ github.event.inputs.engine_version || '1.3.0-onnx-ggml.1' }}
   AIVISSPEECH_EDITOR_VERSION:
     |- # releaseタグ名か、workflow_dispatchでのバージョン名か、999.999.999-developが入る
     ${{ github.event.release.tag_name || github.event.inputs.version || '999.999.999-develop' }}
@@ -161,11 +170,16 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu-')
         run: |
           $sed -i 's|run.exe|./run|g' .env.production
+          $sed -i 's|lib/tts.dll|lib/libtts.so|g' .env.production
+          $sed -i 's|onnxruntime_ep_aivis_ggml/lib/aivis_ggml_onnx_ep.dll|onnxruntime_ep_aivis_ggml/lib/libaivis_ggml_onnx_ep.so|g' .env.production
 
       - name: Overwrite .env.production for macOS
         if: startsWith(matrix.os, 'macos-')
         run: |
           $sed -i 's|AivisSpeech-Engine/run.exe|../Resources/AivisSpeech-Engine/run|g' .env.production
+          $sed -i 's|"--ggml_tts_server_backend", "vulkan"|"--ggml_tts_server_backend", "metal"|g' .env.production
+          $sed -i 's|lib/tts.dll|lib/libtts.dylib|g' .env.production
+          $sed -i 's|onnxruntime_ep_aivis_ggml/lib/aivis_ggml_onnx_ep.dll|onnxruntime_ep_aivis_ggml/lib/libaivis_ggml_onnx_ep.dylib|g' .env.production
 
       - name: Generate public/licenses.json
         run: pnpm run license:generate
@@ -220,6 +234,7 @@ jobs:
         id: download-engine
         uses: ./.github/actions/download-engine
         with:
+          repo: ${{ env.AIVISSPEECH_ENGINE_REPOSITORY }}
           version: ${{ env.AIVISSPEECH_ENGINE_VERSION }}
           dest: ${{ github.workspace }}/AivisSpeech-Engine
           target: ${{ matrix.aivisspeech_engine_asset_name }}

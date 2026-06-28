@@ -19,6 +19,36 @@ import { createLogger } from "@/helpers/log";
 
 const log = createLogger("EngineInfoManager");
 
+function resolvePlatformDefaultEngineExecutionFilePath(
+  executionFilePath: string,
+): string {
+  if (
+    process.platform === "linux" &&
+    path.basename(executionFilePath) === "run.exe"
+  ) {
+    return path.join(path.dirname(executionFilePath), "run");
+  }
+  return executionFilePath;
+}
+
+function resolvePlatformDefaultEngineExecutionArgs(
+  executionArgs: string[],
+): string[] {
+  if (process.platform !== "linux") {
+    return executionArgs;
+  }
+
+  return executionArgs.map((arg) => {
+    if (arg === "lib/tts.dll") {
+      return "lib/libtts.so";
+    }
+    if (arg === "onnxruntime_ep_aivis_ggml/lib/aivis_ggml_onnx_ep.dll") {
+      return "onnxruntime_ep_aivis_ggml/lib/libaivis_ggml_onnx_ep.so";
+    }
+    return arg;
+  });
+}
+
 /** 利用可能なエンジンの情報を管理するクラス */
 export class EngineInfoManager {
   defaultEngineDir: string;
@@ -85,6 +115,9 @@ export class EngineInfoManager {
       .filter((engineInfo) => engineInfo.type != "downloadVvpp")
       .map((engineInfo) => {
         const { protocol, hostname, port, pathname } = new URL(engineInfo.host);
+        const executionFilePath = resolvePlatformDefaultEngineExecutionFilePath(
+          engineInfo.executionFilePath,
+        );
         return {
           ...engineInfo,
           protocol,
@@ -93,7 +126,10 @@ export class EngineInfoManager {
           pathname: pathname === "/" ? "" : pathname,
           isDefault: true,
           type: engineInfo.type,
-          executionFilePath: path.resolve(engineInfo.executionFilePath),
+          executionFilePath: path.resolve(executionFilePath),
+          executionArgs: resolvePlatformDefaultEngineExecutionArgs(
+            engineInfo.executionArgs,
+          ),
           path:
             engineInfo.path == undefined
               ? undefined

@@ -61,6 +61,28 @@
                   対応する GPU が搭載されていないため、GPU モードは利用できません。
                 </QTooltip>
               </ButtonToggleCell>
+              <QCardActions
+                v-if="developmentEngineBackendInfo != undefined"
+                class="development-backend-control no-wrap q-px-md q-pb-sm"
+              >
+                <div class="development-backend-info text-caption">
+                  {{ developmentEngineBackendInfo }}
+                </div>
+                <QSpace />
+                <QSelect
+                  v-if="engineUseGpu && developmentGpuBackendOptions.length > 1"
+                  v-model="developmentGpuBackend"
+                  borderless
+                  dense
+                  emitValue
+                  mapOptions
+                  name="developmentGpuBackend"
+                  :options="developmentGpuBackendOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  class="development-backend-select"
+                />
+              </QCardActions>
               <QCardActions class="no-wrap q-px-md bg-surface-darken">
                 <div>
                   <div>音声のサンプリングレート</div>
@@ -503,6 +525,10 @@ import ToggleCell from "./ToggleCell.vue";
 import ButtonToggleCell from "./ButtonToggleCell.vue";
 import { useStore } from "@/store";
 import {
+  isGgmlExecutionArgs,
+  resolveEngineBackendLabel,
+} from "@/domain/engineExecutionArgs";
+import {
   DEFAULT_AUDIO_FILE_NAME_TEMPLATE,
   buildAudioFileNameFromRawData,
 } from "@/store/utility";
@@ -513,11 +539,16 @@ import {
   ActivePointScrollMode,
   RootMiscSettingType,
   EngineId,
+  DevelopmentGpuBackend,
 } from "@/type/preload";
 import { createLogger } from "@/helpers/log";
 import { useRootMiscSetting } from "@/composables/useRootMiscSetting";
 
 type SamplingRateOption = EngineSettingType["outputSamplingRate"];
+type DevelopmentGpuBackendOption = {
+  label: string;
+  value: DevelopmentGpuBackend;
+};
 
 const dialogOpened = defineModel<boolean>("dialogOpened");
 
@@ -534,6 +565,64 @@ const engineUseGpu = computed({
 });
 const engineIds = computed(() => store.state.engineIds);
 const engineInfos = computed(() => store.state.engineInfos);
+const developmentGpuBackendOptions = computed<DevelopmentGpuBackendOption[]>(
+  () => {
+    const engineId = selectedEngineId.value;
+    const supportedDevices = store.state.engineSupportedDevices[engineId];
+    const engineInfo = engineInfos.value[engineId];
+    const platform =
+      typeof navigator !== "undefined" ? navigator.platform.toLowerCase() : "";
+    const options: DevelopmentGpuBackendOption[] = [
+      { label: "Auto", value: "auto" },
+    ];
+
+    if (supportedDevices?.dml && platform.includes("win")) {
+      options.push({ label: "DirectML", value: "directml" });
+    }
+    if (supportedDevices?.cuda) {
+      options.push({ label: "CUDA", value: "cuda" });
+    }
+    if (engineInfo != undefined && isGgmlExecutionArgs(engineInfo.executionArgs)) {
+      options.push({ label: "GGML", value: "ggml" });
+    }
+
+    return options;
+  },
+);
+const developmentGpuBackend = computed<DevelopmentGpuBackend>({
+  get: () => {
+    const current =
+      store.state.engineSettings[selectedEngineId.value].developmentGpuBackend;
+    if (
+      developmentGpuBackendOptions.value.some(
+        (option) => option.value === current,
+      )
+    ) {
+      return current;
+    }
+
+    return "auto";
+  },
+  set: (developmentGpuBackend) => {
+    void changeDevelopmentGpuBackend(developmentGpuBackend);
+  },
+});
+const developmentEngineBackendInfo = computed(() => {
+  if (import.meta.env.MODE !== "development") {
+    return undefined;
+  }
+
+  const engineInfo = engineInfos.value[selectedEngineId.value];
+  if (engineInfo == undefined) {
+    return undefined;
+  }
+
+  return resolveEngineBackendLabel(
+    engineInfo.executionArgs,
+    engineUseGpu.value,
+    developmentGpuBackend.value,
+  );
+});
 const inheritAudioInfoMode = computed(() => store.state.inheritAudioInfo);
 const activePointScrollMode = computed({
   get: () => store.state.activePointScrollMode,
@@ -694,6 +783,28 @@ const changeUseGpu = async (useGpu: boolean) => {
     useGpu,
     engineId: selectedEngineId.value,
   });
+};
+
+const changeDevelopmentGpuBackend = async (
+  developmentGpuBackend: DevelopmentGpuBackend,
+) => {
+  const engineId = selectedEngineId.value;
+  const engineSetting = store.state.engineSettings[engineId];
+  if (engineSetting.developmentGpuBackend === developmentGpuBackend) {
+    return;
+  }
+
+  await store.actions.SET_ENGINE_SETTING({
+    engineId,
+    engineSetting: {
+      ...engineSetting,
+      developmentGpuBackend,
+    },
+  });
+
+  if (engineUseGpu.value) {
+    await changeUseGpu(true);
+  }
 };
 
 const changeinheritAudioInfo = async (inheritAudioInfo: boolean) => {
@@ -877,6 +988,21 @@ const renderEngineNameLabel = (engineId: EngineId) => {
   letter-spacing: 0.03333em;
   margin-top: 2px;
   color: #c6c6c6;
+}
+
+.development-backend-control {
+  margin-top: -8px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.development-backend-info {
+  color: colors.$display;
+  opacity: 0.7;
+}
+
+.development-backend-select {
+  min-width: 120px;
 }
 
 .hotkey-table {
